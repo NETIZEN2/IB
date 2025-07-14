@@ -32,6 +32,13 @@
             border-color: #333333 !important;
             border-left-width: 10px;
         }
+        .priority-card.new-item {
+            animation: highlight-new 2s ease-out;
+        }
+        @keyframes highlight-new {
+            0% { background-color: #e0f2fe; } /* light-sky-100 */
+            100% { background-color: #FFFFFF; }
+        }
 
         .loader {
             border: 4px solid #e0e0e0; 
@@ -39,7 +46,7 @@
             border-radius: 50%;
             width: 40px; height: 40px; 
             animation: spin 1s linear infinite; 
-            margin: 3rem auto;
+            margin: 2rem auto;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -68,8 +75,13 @@
         <!-- Left Column: Priority Feed -->
         <div class="w-1/2 flex flex-col h-full">
             <header class="mb-4 border-b-2 border-black pb-4 flex-shrink-0">
-                <h1 class="text-3xl font-bold text-black">Intelligence Briefing</h1>
-                <p class="text-gray-600 mono-font text-sm">Curated analysis of global events.</p>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-black">Intelligence Briefing</h1>
+                        <p class="text-gray-600 mono-font text-sm">Curated analysis of global events.</p>
+                    </div>
+                    <button id="settings-btn" class="control-btn font-semibold p-2"><i class="ph ph-gear text-xl"></i></button>
+                </div>
                 
                 <div class="mt-4 flex gap-2">
                     <input id="rfi-search-input" type="text" placeholder="Request for Information (e.g., 'AUKUS pillar 2 status')" class="brutalist-pane w-full p-2 mono-font text-sm focus:outline-none focus:border-black">
@@ -93,15 +105,7 @@
         <div id="analysis-panel" class="w-1/2 brutalist-pane flex flex-col h-full overflow-y-auto"></div>
     </div>
     
-    <div id="report-modal" class="modal-overlay">
-        <div class="brutalist-pane w-full max-w-4xl p-6 modal-content flex flex-col">
-            <div class="flex justify-between items-center border-b-2 border-black pb-2 mb-4">
-                <h2 id="modal-title" class="text-xl font-bold mono-font"></h2>
-                <button id="close-modal-btn" class="control-btn font-bold w-8 h-8">&times;</button>
-            </div>
-            <div id="modal-body" class="overflow-y-auto"></div>
-        </div>
-    </div>
+    <div id="modal-container"></div>
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -111,10 +115,8 @@
         const rfiInput = document.getElementById('rfi-search-input');
         const rfiBtn = document.getElementById('rfi-search-btn');
         const exportBtn = document.getElementById('export-btn');
-        const reportModal = document.getElementById('report-modal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const closeModalBtn = document.getElementById('close-modal-btn');
+        const settingsBtn = document.getElementById('settings-btn');
+        const modalContainer = document.getElementById('modal-container');
 
         const intelCategories = {
             "Geopolitical Flashpoints": { color: "#D87C5A", icon: "ph-fire" },
@@ -125,14 +127,25 @@
         };
 
         const now = new Date();
-        const newsData = [
+        let masterNewsData = [
             { id: 100, isSynthesized: true, category: "Geopolitical Flashpoints", title: "Heightened Tensions in South China Sea", relevance: 1, timestamp: new Date(now.getTime() - 4 * 3600 * 1000), sentiment: -0.7, entities: ['South China Sea', 'China', 'Philippines', 'USA'], sources: [ { name: "Reuters", snippet: "A naval standoff occurred between Chinese and Philippine vessels..." }, { name: "Defense News", snippet: "A top US commander stated that China has so far failed to coerce its rivals..." }, { name: "Associated Press", snippet: "The Philippine coast guard has accused China of 'dangerous maneuvers'..." } ], impact: "Directly challenges freedom of navigation in critical sea lanes, increasing regional instability." },
-            { id: 2, category: "Defence Tech & Procurement", title: "RAAF Receives JASSM-ER", source: "Janes Defence", relevance: 1, timestamp: new Date(now.getTime() - 8 * 3600 * 1000), sentiment: 0.8, entities: ['RAAF', 'JASSM-ER', 'Australia', 'USA'], snippet: "The Royal Australian Air Force has taken delivery of the first tranche of Joint Air-to-Surface Standoff Missiles (JASSM-ER)...", impact: "Significantly enhances ADF's long-range strike capability, creating a more credible deterrent." },
-            { id: 3, category: "Cyber & Info Warfare", title: "Energy Grid Targeted", source: "ASD", relevance: 1, timestamp: new Date(now.getTime() - 2 * 3600 * 1000), sentiment: -0.9, entities: ['ASD', 'Australia', 'Cyber Attack', 'China'], snippet: "The Australian Cyber Security Centre has issued an alert regarding a sophisticated campaign by state-sponsored actors targeting critical infrastructure...", impact: "Reveals active reconnaissance against national critical infrastructure, indicating potential for future disruption." },
-            { id: 4, category: "Supply Chain & Resources", title: "Global Microchip Shortage", source: "Financial Times", relevance: 2, timestamp: new Date(now.getTime() - 24 * 3600 * 1000), sentiment: -0.5, entities: ['Microchips', 'Supply Chain', 'Taiwan'], snippet: "A persistent global shortage of high-end microchips is causing delays in the production of advanced defence systems...", impact: "Threatens to delay key defence projects and highlights sovereign manufacturing vulnerabilities." },
             { id: 6, category: "Defence Tech & Procurement", title: "AUKUS Welder Shortage", source: "Asia Pacific Defence Reporter", relevance: 1, timestamp: new Date(now.getTime() - 1 * 3600 * 1000), sentiment: -0.6, entities: ['AUKUS', 'Australia', 'USA', 'UK'], snippet: "A critical shortage of qualified welders in Australia is threatening the timeline for the delivery of nuclear-powered submarines under the AUKUS security pact...", impact: "Highlights critical domestic skill gaps that directly threaten the timeline and viability of a cornerstone national security project." },
+            { id: 3, category: "Cyber & Info Warfare", title: "Energy Grid Targeted", source: "ASD", relevance: 1, timestamp: new Date(now.getTime() - 2 * 3600 * 1000), sentiment: -0.9, entities: ['ASD', 'Australia', 'Cyber Attack', 'China'], snippet: "The Australian Cyber Security Centre has issued an alert regarding a sophisticated campaign by state-sponsored actors targeting critical infrastructure...", impact: "Reveals active reconnaissance against national critical infrastructure, indicating potential for future disruption." },
+            { id: 2, category: "Defence Tech & Procurement", title: "RAAF Receives JASSM-ER", source: "Janes Defence", relevance: 1, timestamp: new Date(now.getTime() - 8 * 3600 * 1000), sentiment: 0.8, entities: ['RAAF', 'JASSM-ER', 'Australia', 'USA'], snippet: "The Royal Australian Air Force has taken delivery of the first tranche of Joint Air-to-Surface Standoff Missiles (JASSM-ER)...", impact: "Significantly enhances ADF's long-range strike capability, creating a more credible deterrent." },
             { id: 7, category: "Geopolitical Flashpoints", title: "New Pacific Security Pact", source: "The Guardian", relevance: 2, timestamp: new Date(now.getTime() - 36 * 3600 * 1000), sentiment: 0.4, entities: ['Pacific Islands', 'Australia', 'New Zealand'], snippet: "Several Pacific Island nations have signed a new joint security pact aimed at increasing maritime surveillance and disaster response capabilities, with support from Australia and New Zealand.", impact: "Strengthens regional partnerships and provides a counter-narrative to external influence in the Pacific." },
-        ];
+            { id: 4, category: "Supply Chain & Resources", title: "Global Microchip Shortage", source: "Financial Times", relevance: 2, timestamp: new Date(now.getTime() - 24 * 3600 * 1000), sentiment: -0.5, entities: ['Microchips', 'Supply Chain', 'Taiwan'], snippet: "A persistent global shortage of high-end microchips is causing delays in the production of advanced defence systems...", impact: "Threatens to delay key defence projects and highlights sovereign manufacturing vulnerabilities." },
+            { id: 8, category: "Cyber & Info Warfare", title: "Disinformation Campaign Detected", source: "DFRLab", relevance: 2, timestamp: new Date(now.getTime() - 10 * 3600 * 1000), sentiment: -0.8, entities: ['Disinformation', 'Social Media'], snippet: "A coordinated disinformation campaign targeting allied nations has been identified, utilizing social media bots to spread divisive narratives.", impact: "Erodes public trust and attempts to sow discord, requiring a coordinated public information response." },
+            { id: 9, category: "Supply Chain & Resources", title: "Port Strike Impacts Shipping", source: "Lloyd's List", relevance: 2, timestamp: new Date(now.getTime() - 72 * 3600 * 1000), sentiment: -0.6, entities: ['Supply Chain', 'Shipping'], snippet: "A major port strike on the west coast of the US is causing significant backlogs, impacting global shipping and supply chains for critical components.", impact: "Creates downstream delays for both commercial and potentially defence-related imports." },
+            { id: 10, category: "Defence Tech & Procurement", title: "New Drone Swarm Tech Tested", source: "US DoD", relevance: 2, timestamp: new Date(now.getTime() - 48 * 3600 * 1000), sentiment: 0.5, entities: ['Drones', 'AI', 'USA'], snippet: "The US military has successfully tested a new generation of autonomous drone swarms, capable of coordinated action without human intervention.", impact: "Represents a significant leap in autonomous warfare, potentially changing tactical doctrines." },
+            { id: 11, category: "Australian Domestic Policy", title: "Critical Infrastructure Bill Passes", source: "Parliament of Australia", relevance: 1, timestamp: new Date(now.getTime() - 96 * 3600 * 1000), sentiment: 0.3, entities: ['Australia', 'Cyber Attack'], snippet: "New legislation has passed, granting the government expanded powers to intervene in privately-owned critical infrastructure companies during major cyber attacks.", impact: "Strengthens national resilience against cyber threats but raises questions about government overreach." },
+            { id: 12, category: "Geopolitical Flashpoints", title: "Border Skirmish Reported", source: "BBC News", relevance: 2, timestamp: new Date(now.getTime() - 120 * 3600 * 1000), sentiment: -0.8, entities: ['India', 'China'], snippet: "Reports are emerging of a minor border skirmish between Indian and Chinese troops in the Himalayan region, with no casualties reported.", impact: "Indicates continued friction and the potential for rapid escalation at the contested border." },
+            { id: 13, category: "Supply Chain & Resources", title: "Rare Earth Mineral Discovery", source: "Mining Weekly", relevance: 3, timestamp: new Date(now.getTime() - 150 * 3600 * 1000), sentiment: 0.6, entities: ['Supply Chain', 'Mining', 'Australia'], snippet: "A significant new deposit of rare earth minerals has been discovered in Western Australia, potentially reducing reliance on traditional suppliers.", impact: "Boosts Australia's role in the critical minerals supply chain, enhancing economic and strategic security." },
+            { id: 14, category: "Cyber & Info Warfare", title: "Ransomware Hits Major Hospital", source: "CyberScoop", relevance: 2, timestamp: new Date(now.getTime() - 180 * 3600 * 1000), sentiment: -0.9, entities: ['Cyber Attack', 'Ransomware'], snippet: "A major hospital network has been forced to shut down systems and divert patients following a debilitating ransomware attack.", impact: "Demonstrates the real-world kinetic impact of cyber attacks on civilian services and public safety." },
+        ].sort((a, b) => b.timestamp - a.timestamp);
+
+        let displayedArticles = [];
+        const articlesPerPage = 5;
+        let isLoading = false;
 
         function formatTimeAgo(date) {
             const seconds = Math.floor((new Date() - date) / 1000);
@@ -143,19 +156,25 @@
         }
 
         function renderPriorityFeed(sortBy = 'relevance') {
-            priorityFeed.innerHTML = '';
-            const sortedData = [...newsData].sort((a, b) => {
+            const sortedData = [...displayedArticles].sort((a, b) => {
                 if (sortBy === 'relevance') return a.relevance - b.relevance || b.timestamp - a.timestamp;
                 return b.timestamp - a.timestamp;
             });
+            
+            priorityFeed.innerHTML = '';
             sortedData.forEach(article => {
                 const categoryInfo = intelCategories[article.category];
                 const card = document.createElement('div');
                 card.className = 'priority-card brutalist-pane p-4 cursor-pointer';
+                if (article.isNew) {
+                    card.classList.add('new-item');
+                    setTimeout(() => card.classList.remove('new-item'), 2000);
+                    delete article.isNew;
+                }
                 card.style.borderColor = categoryInfo.color;
                 card.dataset.id = article.id;
                 const sourceText = article.isSynthesized ? `MULTIPLE SOURCES (${article.sources.length})` : `SOURCE: ${article.source}`;
-                const snippetText = article.isSynthesized ? `AI-SYNTHESIZED BRIEF: Reports from ${article.sources.map(s => s.name).join(', ')} indicate heightened tensions...` : article.snippet;
+                const snippetText = article.snippet; // Always use the latest snippet
                 card.innerHTML = `<div class="flex justify-between items-start mb-2"><p class="text-sm font-bold mono-font" style="color:${categoryInfo.color};">${article.category.toUpperCase()}</p><i class="ph ${categoryInfo.icon} text-xl" style="color:${categoryInfo.color};"></i></div><h3 class="text-xl font-bold text-black mb-2">${article.title}</h3><p class="text-sm text-gray-700 mb-3">${snippetText}</p><div class="flex justify-between items-center text-sm text-gray-600 mb-3 mono-font"><span>${sourceText}</span><span>${formatTimeAgo(article.timestamp)}</span></div><p class="font-semibold text-gray-800 bg-gray-100 p-3 border-l-2 border-gray-400">“${article.impact}”</p>`;
                 card.addEventListener('click', () => {
                     document.querySelectorAll('.priority-card').forEach(c => c.classList.remove('active'));
@@ -166,8 +185,75 @@
             });
         }
 
+        function appendArticles(articlesToAppend) {
+            articlesToAppend.forEach(article => {
+                const categoryInfo = intelCategories[article.category];
+                const card = document.createElement('div');
+                card.className = 'priority-card brutalist-pane p-4 cursor-pointer';
+                card.style.borderColor = categoryInfo.color;
+                card.dataset.id = article.id;
+                const sourceText = article.isSynthesized ? `MULTIPLE SOURCES (${article.sources.length})` : `SOURCE: ${article.source}`;
+                const snippetText = article.snippet;
+                card.innerHTML = `<div class="flex justify-between items-start mb-2"><p class="text-sm font-bold mono-font" style="color:${categoryInfo.color};">${article.category.toUpperCase()}</p><i class="ph ${categoryInfo.icon} text-xl" style="color:${categoryInfo.color};"></i></div><h3 class="text-xl font-bold text-black mb-2">${article.title}</h3><p class="text-sm text-gray-700 mb-3">${snippetText}</p><div class="flex justify-between items-center text-sm text-gray-600 mb-3 mono-font"><span>${sourceText}</span><span>${formatTimeAgo(article.timestamp)}</span></div><p class="font-semibold text-gray-800 bg-gray-100 p-3 border-l-2 border-gray-400">“${article.impact}”</p>`;
+                card.addEventListener('click', () => {
+                    document.querySelectorAll('.priority-card').forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                    renderAnalysis(article.id);
+                });
+                priorityFeed.appendChild(card);
+            });
+        }
+
+        function loadMoreArticles() {
+            if (isLoading || displayedArticles.length >= masterNewsData.length) {
+                const endMessage = document.getElementById('end-of-feed');
+                if (!endMessage) {
+                    const div = document.createElement('div');
+                    div.id = 'end-of-feed';
+                    div.className = 'text-center text-gray-500 mono-font text-sm py-4';
+                    div.textContent = '// END OF FEED //';
+                    priorityFeed.appendChild(div);
+                }
+                return;
+            };
+            isLoading = true;
+            
+            const loader = document.createElement('div');
+            loader.className = 'loader';
+            priorityFeed.appendChild(loader);
+
+            setTimeout(() => {
+                const currentCount = displayedArticles.length;
+                const newArticles = masterNewsData.slice(currentCount, currentCount + articlesPerPage);
+                displayedArticles.push(...newArticles);
+                
+                loader.remove();
+                appendArticles(newArticles);
+                isLoading = false;
+            }, 1000);
+        }
+
+        function checkForNewArticle() {
+            const newReport = { name: "Nikkei Asia", snippet: "Further reports indicate Chinese coast guard vessels have deployed water cannons during the standoff near Second Thomas Shoal.", fullText: "TOKYO - Further reports from regional observers indicate Chinese coast guard vessels have deployed water cannons during the standoff near Second Thomas Shoal. The use of water cannons is a common grey-zone tactic employed by China to harass and intimidate vessels without resorting to direct military force. This action is consistent with a pattern of escalating pressure on Philippine assets in the area." };
+            const existingArticle = masterNewsData.find(a => a.id === 100);
+            
+            if (existingArticle) {
+                // FIX: Intelligent consolidation logic
+                existingArticle.sources.push(newReport);
+                existingArticle.timestamp = new Date();
+                existingArticle.isNew = true;
+                // Update the snippet to reflect the new information
+                existingArticle.snippet = `AI-SYNTHESIZED BRIEF: Now consolidating ${existingArticle.sources.length} reports. Latest intelligence confirms use of water cannons during the standoff.`;
+                existingArticle.impact = "Updated Assessment: Escalatory grey-zone tactics increase risk of miscalculation in critical sea lanes.";
+            }
+            
+            const activeButton = document.querySelector('.control-btn.active');
+            const sortBy = activeButton ? activeButton.dataset.sort : 'relevance';
+            renderPriorityFeed(sortBy);
+        }
+
         function renderAnalysis(id) {
-            const article = newsData.find(a => a.id === parseInt(id));
+            const article = masterNewsData.find(a => a.id === parseInt(id));
             if (!article) return;
             const tabs = `<button class="control-btn active font-semibold py-1 px-3 text-sm" data-tab="analysis">Deep Analysis</button><button class="control-btn font-semibold py-1 px-3 text-sm" data-tab="network">Network</button><button class="control-btn font-semibold py-1 px-3 text-sm" data-tab="sentiment">Sentiment</button>`;
             analysisPanel.innerHTML = `<div class="p-6"><h2 class="text-xl font-bold text-black mb-4 mono-font">// ANALYSIS: ${article.title}</h2><div class="flex items-center gap-2 mb-4">${tabs}</div><div id="analysis-content" class="space-y-6"></div></div>`;
@@ -188,25 +274,14 @@
         }
 
         function renderNetwork(article, container) {
-            const relatedArticles = newsData.filter(item => item.id !== article.id && item.entities.some(entity => article.entities.includes(entity)));
-            
-            // MODIFICATION: Replaced visual graph with a simple list
+            const relatedArticles = masterNewsData.filter(item => item.id !== article.id && item.entities.some(entity => article.entities.includes(entity)));
             let networkHtml = `<h4 class="text-lg font-bold text-black mt-4 mb-2 mono-font">Entity Connections</h4><div class="space-y-3">`;
-            
             if (relatedArticles.length > 0) {
                 relatedArticles.forEach(related => {
                     const commonEntities = related.entities.filter(e => article.entities.includes(e));
-                    networkHtml += `
-                        <a href="https://www.google.com/search?q=${encodeURIComponent(related.title)}" target="_blank" class="block border-t-2 pt-3 pb-2 hover:bg-gray-100 p-2">
-                            <p class="font-bold">${related.title}</p>
-                            <p class="text-sm text-gray-500">Linked via: <span class="font-semibold text-black">${commonEntities.join(', ')}</span></p>
-                        </a>
-                    `;
+                    networkHtml += `<a href="https://www.google.com/search?q=${encodeURIComponent(related.title)}" target="_blank" class="block border-t-2 pt-3 pb-2 hover:bg-gray-100 p-2"><p class="font-bold">${related.title}</p><p class="text-sm text-gray-500">Linked via: <span class="font-semibold text-black">${commonEntities.join(', ')}</span></p></a>`;
                 });
-            } else {
-                networkHtml += `<p class="text-sm text-gray-600">No direct connections found in the current feed.</p>`;
-            }
-            
+            } else { networkHtml += `<p class="text-sm text-gray-600">No direct connections found in the current feed.</p>`; }
             networkHtml += `</div>`;
             container.innerHTML = networkHtml;
         }
@@ -228,87 +303,89 @@
 
         async function getAnalysis(article, container) {
             container.innerHTML = '<div class="loader"></div>';
-            const textToAnalyze = article.isSynthesized ? article.sources.map(s => `Source: ${s.name}\nSnippet: ${s.snippet}`).join('\n---\n') : `Source: ${article.source}\nSnippet: ${article.snippet}`;
-            
-            let sourceHtml = `<div class="mb-6"><h4 class="text-lg font-bold text-black mb-2 mono-font">Source Report(s)</h4><div class="space-y-3 bg-gray-50 p-3 border-2 border-gray-200">`;
-            if (article.isSynthesized) {
-                article.sources.forEach(source => { sourceHtml += `<div><p class="font-semibold mono-font text-sm">${source.name}</p><p class="text-sm text-gray-700 italic">"${source.snippet}"</p></div>`; });
-            } else {
-                sourceHtml += `<div><p class="font-semibold mono-font text-sm">${article.source}</p><p class="text-sm text-gray-700 italic">"${article.snippet}"</p></div>`;
+            const apiKey = localStorage.getItem('googleAIApiKey');
+            if (!apiKey) {
+                container.innerHTML = `<div class="brutalist-pane p-4 bg-amber-50 border-amber-500"><h4 class="font-bold text-amber-800">API Key Required</h4><p class="text-sm text-amber-700">Please enter your Google AI API key in the settings panel to enable AI analysis features.</p></div>`;
+                return;
             }
+            const textToAnalyze = article.isSynthesized ? article.sources.map(s => `Source: ${s.name}\nSnippet: ${s.snippet}`).join('\n---\n') : `Source: ${article.source}\nSnippet: ${article.snippet}`;
+            let sourceHtml = `<div class="mb-6"><h4 class="text-lg font-bold text-black mb-2 mono-font">Source Report(s)</h4><div id="source-list" class="space-y-3 bg-gray-50 p-3 border-2 border-gray-200">`;
+            const sources = article.isSynthesized ? article.sources : [{ name: article.source, snippet: article.snippet, fullText: article.fullText }];
+            sources.forEach((source, index) => {
+                sourceHtml += `<div class="source-item border-b border-gray-200 pb-2"><div class="source-header flex justify-between items-center cursor-pointer p-1"><p class="font-semibold mono-font text-sm">${source.name}</p><i class="ph ph-caret-down caret-icon"></i></div><div class="source-content pl-1"><p class="text-sm text-gray-700">${source.fullText || source.snippet}</p></div></div>`;
+            });
             sourceHtml += `</div></div>`;
-
             try {
-                const prompt = `
-                    As a senior intelligence analyst for the Australian Defence Force, analyze the following report(s).
-                    Provide a detailed, structured analysis. The output MUST be a valid JSON object only, with no other text. The structure is:
-                    {
-                      "implications": [
-                        { "point": "First key implication.", "elaboration": "Detailed elaboration on this point, including second and third-order effects." },
-                        { "point": "Second key implication.", "elaboration": "Detailed elaboration..." }
-                      ],
-                      "scenarios": {
-                        "bestCase": { "title": "Best Case", "description": "A detailed paragraph describing a plausible de-escalatory or advantageous outcome." },
-                        "mostLikely": { "title": "Most Likely", "description": "A detailed paragraph describing the most probable continuation of events." },
-                        "worstCase": { "title": "Worst Case", "description": "A detailed paragraph describing a potential escalatory or highly negative outcome." }
-                      }
-                    }
-                    Analyze this information: "${textToAnalyze}"
-                `;
+                const prompt = `As a senior intelligence analyst for the Australian Defence Force, analyze the following report(s). Provide a detailed, structured analysis. The output MUST be a valid JSON object only, with no other text. The structure is: {"implications": [{"point": "string", "elaboration": "string"}], "scenarios": {"bestCase": {"title": "Best Case", "description": "string"}, "mostLikely": {"title": "Most Likely", "description": "string"}, "worstCase": {"title": "Worst Case", "description": "string"}}}. Analyze this information: "${textToAnalyze}"`;
                 const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-                const apiKey = "";
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
                 const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                if (!response.ok) throw new Error(`API Error: ${response.status}. Check your API key or network.`);
                 const result = await response.json();
                 if (result.candidates && result.candidates[0].content.parts.length > 0) {
                     let rawText = result.candidates[0].content.parts[0].text;
                     const startIndex = rawText.indexOf('{');
                     const endIndex = rawText.lastIndexOf('}');
-                    if (startIndex === -1 || endIndex === -1) {
-                        throw new Error("No valid JSON found in AI response.");
-                    }
+                    if (startIndex === -1 || endIndex === -1) throw new Error("No valid JSON found in AI response.");
                     const jsonString = rawText.substring(startIndex, endIndex + 1);
-                    
                     const analysisData = JSON.parse(jsonString);
-                    
                     let implicationsHtml = '<div class="brutalist-pane p-4"><h4 class="text-base font-bold text-black mb-2 mono-font">Strategic Implications</h4><div class="space-y-3">';
-                    analysisData.implications.forEach(item => {
-                        implicationsHtml += `<div class="border-l-2 pl-3 border-gray-300"><p class="font-semibold">${item.point}</p><p class="text-sm text-gray-700">${item.elaboration}</p></div>`;
-                    });
+                    analysisData.implications.forEach(item => { implicationsHtml += `<div class="border-l-2 pl-3 border-gray-300"><p class="font-semibold">${item.point}</p><p class="text-sm text-gray-700">${item.elaboration}</p></div>`; });
                     implicationsHtml += '</div></div>';
-
                     let scenariosHtml = '<div class="brutalist-pane p-4 mt-4"><h4 class="text-base font-bold text-black mb-2 mono-font">Projected Scenarios</h4><div class="space-y-3">';
                     const scenarios = analysisData.scenarios;
                     scenariosHtml += `<div><strong class="text-green-700">${scenarios.bestCase.title}:</strong> <p class="text-sm text-gray-700">${scenarios.bestCase.description}</p></div>`;
                     scenariosHtml += `<div><strong class="text-amber-700">${scenarios.mostLikely.title}:</strong> <p class="text-sm text-gray-700">${scenarios.mostLikely.description}</p></div>`;
                     scenariosHtml += `<div><strong class="text-red-700">${scenarios.worstCase.title}:</strong> <p class="text-sm text-gray-700">${scenarios.worstCase.description}</p></div>`;
                     scenariosHtml += '</div></div>';
-
                     container.innerHTML = sourceHtml + implicationsHtml + scenariosHtml;
+                    document.querySelectorAll('.source-header').forEach(header => {
+                        header.addEventListener('click', () => {
+                            const content = header.nextElementSibling;
+                            const icon = header.querySelector('.caret-icon');
+                            content.classList.toggle('open');
+                            icon.classList.toggle('open');
+                        });
+                    });
                 } else { throw new Error("No content from AI."); }
-            } catch (error) { container.innerHTML = `<p class="text-red-600 mono-font">// AI ANALYSIS FAILED: ${error.message}.</p>`; }
+            } catch (error) { container.innerHTML = `<p class="text-red-600 mono-font">// AI ANALYSIS FAILED: ${error.message}</p>`; }
         }
         
+        function openModal(title, bodyHtml) {
+            modalContainer.innerHTML = `<div id="report-modal" class="modal-overlay open"><div class="brutalist-pane w-full max-w-4xl p-6 modal-content flex flex-col bg-white"><div class="flex justify-between items-center border-b-2 border-black pb-2 mb-4"><h2 class="text-xl font-bold mono-font">${title}</h2><button id="close-modal-btn" class="control-btn font-bold w-8 h-8">&times;</button></div><div id="modal-body" class="overflow-y-auto">${bodyHtml}</div></div></div>`;
+            document.getElementById('close-modal-btn').addEventListener('click', () => modalContainer.innerHTML = '');
+        }
+
         async function handleRfiSearch() {
             const query = rfiInput.value;
             if (!query) return;
-            modalTitle.textContent = "Request for Information";
-            modalBody.innerHTML = '<div class="loader"></div>';
-            reportModal.classList.add('open');
+            openModal("Request for Information", '<div class="loader"></div>');
             const prompt = `You are an AI research assistant for an ADF intelligence officer. The user has submitted the following Request for Information (RFI): "${query}". Based on open-source intelligence principles, provide a synthesized report answering their query. Structure your response with a concise Executive Summary, followed by bulleted Key Points.`;
-            await getAnalysis({snippet: query}, modalBody);
+            await getAnalysis({snippet: query}, document.getElementById('modal-body'));
         }
         
         function handleExport() {
-            modalTitle.textContent = "SITREP Export Preview";
             let reportHtml = `<h3 class="text-lg font-bold mb-2">Situation Report: ${new Date().toDateString()}</h3>`;
-            const topArticles = newsData.filter(a => a.relevance <= 2).sort((a,b) => a.relevance - b.relevance);
+            const topArticles = masterNewsData.filter(a => a.relevance <= 2).sort((a,b) => a.relevance - b.relevance);
             topArticles.forEach(article => {
                 reportHtml += `<div class="border-t-2 border-black mt-4 pt-4"><h4 class="font-bold text-lg">${article.title}</h4><p class="text-sm text-gray-600 mono-font">${article.category.toUpperCase()} // RELEVANCE: ${article.relevance}</p><p class="mt-2 text-sm">${article.isSynthesized ? `AI-SYNTHESIZED BRIEF: Reports from ${article.sources.map(s => s.name).join(', ')} indicate heightened tensions...` : article.snippet}</p><p class="mt-2 font-semibold bg-gray-100 p-2">IMPACT: ${article.impact}</p></div>`;
             });
-            modalBody.innerHTML = reportHtml;
-            reportModal.classList.add('open');
+            openModal("SITREP Export Preview", reportHtml);
+        }
+
+        function handleSettings() {
+            const currentKey = localStorage.getItem('googleAIApiKey') || '';
+            const settingsHtml = `<div class="space-y-4"><p class="text-sm text-gray-600">Enter your Google AI API key to enable AI-powered features. Your key is saved only in your browser's local storage and is never sent to our servers.</p><div><label for="api-key-input" class="font-bold mono-font">Google AI API Key</label><input id="api-key-input" type="password" value="${currentKey}" class="brutalist-pane w-full p-2 mono-font text-sm mt-1 focus:outline-none focus:border-black" placeholder="Enter your API key..."></div><a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-sm text-blue-600 hover:underline">Get an API key from Google AI Studio &rarr;</a><div class="flex justify-end gap-2 pt-4 border-t-2"><button id="save-key-btn" class="control-btn active font-semibold py-2 px-4">Save Key</button></div></div>`;
+            openModal("Settings", settingsHtml);
+            document.getElementById('save-key-btn').addEventListener('click', () => {
+                const newKey = document.getElementById('api-key-input').value;
+                localStorage.setItem('googleAIApiKey', newKey);
+                modalContainer.innerHTML = ''; // Close modal
+                const activeCard = document.querySelector('.priority-card.active');
+                if (activeCard) {
+                    renderAnalysis(activeCard.dataset.id);
+                }
+            });
         }
 
         filterControls.addEventListener('click', (e) => {
@@ -322,10 +399,24 @@
         rfiBtn.addEventListener('click', handleRfiSearch);
         rfiInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleRfiSearch(); });
         exportBtn.addEventListener('click', handleExport);
-        closeModalBtn.addEventListener('click', () => reportModal.classList.remove('open'));
+        settingsBtn.addEventListener('click', handleSettings);
 
+        // Initial Load
+        displayedArticles = masterNewsData.slice(0, articlesPerPage);
         renderPriorityFeed();
         renderStandbyPanel();
+
+        // Auto-update interval
+        setInterval(checkForNewArticle, 15000);
+        
+        // FIX: Replaced IntersectionObserver with a more reliable scroll event listener
+        priorityFeed.addEventListener('scroll', () => {
+            if (isLoading || displayedArticles.length >= masterNewsData.length) return;
+            // Check if user is near the bottom of the scrollable area
+            if (priorityFeed.scrollTop + priorityFeed.clientHeight >= priorityFeed.scrollHeight - 100) {
+                loadMoreArticles();
+            }
+        });
     });
     </script>
 </body>
