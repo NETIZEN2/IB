@@ -18,8 +18,13 @@ const run = async () => {
 
   // dispatcher with failing AI client falls back to rules
   const failingClient = { score: async () => { throw new Error('AI down'); } };
-  const fallbackScore = await scoreItem(item, { aiClient: failingClient });
-  assert.strictEqual(fallbackScore, 2);
+  try {
+    await scoreItem(item, { aiClient: failingClient });
+    assert.fail('Expected scoreItem to throw');
+  } catch (err) {
+    assert.strictEqual(err.fallbackScore, 2);
+    assert.match(err.message, /AI client failed/);
+  }
 
   console.log('Rule tests passed');
 };
