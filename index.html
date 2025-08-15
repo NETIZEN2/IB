@@ -59,7 +59,7 @@
         
         .control-btn { background-color: #FFFFFF; border: 2px solid #e0e0e0; transition: all 0.2s ease; }
         .control-btn.active, .control-btn:hover { background-color: #333333; color: #FFFFFF; border-color: #333333; }
-        
+
         .modal-overlay {
             position: fixed; inset: 0; background-color: rgba(0,0,0,0.5);
             backdrop-filter: blur(4px); z-index: 1000; display: none;
@@ -67,6 +67,9 @@
         }
         .modal-overlay.open { display: flex; }
         .modal-content { max-height: 85vh; }
+
+        .automation-indicator { color: #D3CFCB; }
+        .automation-indicator.active { color: #333333; }
     </style>
 </head>
 <body class="h-screen w-screen">
@@ -80,7 +83,14 @@
                         <h1 class="text-3xl font-bold text-black">Intelligence Briefing</h1>
                         <p class="text-gray-600 mono-font text-sm">Curated analysis of global events.</p>
                     </div>
-                    <button id="settings-btn" class="control-btn font-semibold p-2"><i class="ph ph-gear text-xl"></i></button>
+                    <div class="flex items-center gap-2">
+                        <div id="automation-indicators" class="flex gap-2 mr-2">
+                            <i id="indicator-refresh" class="ph ph-arrows-clockwise automation-indicator" title="Auto Refresh"></i>
+                            <i id="indicator-consolidate" class="ph ph-git-merge automation-indicator" title="Auto Consolidate"></i>
+                            <i id="indicator-analysis" class="ph ph-brain automation-indicator" title="Background Analysis"></i>
+                        </div>
+                        <button id="settings-btn" class="control-btn font-semibold p-2"><i class="ph ph-gear text-xl"></i></button>
+                    </div>
                 </div>
                 
                 <div class="mt-4 flex gap-2">
@@ -117,6 +127,21 @@
         const exportBtn = document.getElementById('export-btn');
         const settingsBtn = document.getElementById('settings-btn');
         const modalContainer = document.getElementById('modal-container');
+        const indicatorRefresh = document.getElementById('indicator-refresh');
+        const indicatorConsolidate = document.getElementById('indicator-consolidate');
+        const indicatorAnalysis = document.getElementById('indicator-analysis');
+
+        const defaultPrefs = { autoRefresh: true, autoConsolidate: true, backgroundAnalysis: false };
+        Object.keys(defaultPrefs).forEach(key => {
+            if (localStorage.getItem(key) === null) localStorage.setItem(key, defaultPrefs[key]);
+        });
+        const getPref = key => localStorage.getItem(key) === 'true';
+        function updateAutomationIndicators() {
+            indicatorRefresh.classList.toggle('active', getPref('autoRefresh'));
+            indicatorConsolidate.classList.toggle('active', getPref('autoConsolidate'));
+            indicatorAnalysis.classList.toggle('active', getPref('backgroundAnalysis'));
+        }
+        updateAutomationIndicators();
 
         const intelCategories = {
             "Geopolitical Flashpoints": { color: "#D87C5A", icon: "ph-fire" },
@@ -225,28 +250,69 @@
             setTimeout(() => {
                 const currentCount = displayedArticles.length;
                 const newArticles = masterNewsData.slice(currentCount, currentCount + articlesPerPage);
-                displayedArticles.push(...newArticles);
-                
+                const articlesToAdd = [];
+                if (getPref('autoConsolidate')) {
+                    newArticles.forEach(article => {
+                        const existing = displayedArticles.find(a => a.id === article.id);
+                        if (existing) {
+                            existing.sources = existing.sources || [];
+                            if (article.source) existing.sources.push({ name: article.source, snippet: article.snippet });
+                        } else {
+                            articlesToAdd.push(article);
+                        }
+                    });
+                } else {
+                    articlesToAdd.push(...newArticles);
+                }
+                displayedArticles.push(...articlesToAdd);
+
                 loader.remove();
-                appendArticles(newArticles);
+                appendArticles(articlesToAdd);
+                if (getPref('backgroundAnalysis')) {
+                    articlesToAdd.forEach(a => getAnalysis(a, document.createElement('div')));
+                }
                 isLoading = false;
             }, 1000);
         }
 
         function checkForNewArticle() {
+            if (!getPref('autoRefresh')) return;
             const newReport = { name: "Nikkei Asia", snippet: "Further reports indicate Chinese coast guard vessels have deployed water cannons during the standoff near Second Thomas Shoal.", fullText: "TOKYO - Further reports from regional observers indicate Chinese coast guard vessels have deployed water cannons during the standoff near Second Thomas Shoal. The use of water cannons is a common grey-zone tactic employed by China to harass and intimidate vessels without resorting to direct military force. This action is consistent with a pattern of escalating pressure on Philippine assets in the area." };
             const existingArticle = masterNewsData.find(a => a.id === 100);
-            
+
+            let targetArticle = null;
             if (existingArticle) {
-                // FIX: Intelligent consolidation logic
-                existingArticle.sources.push(newReport);
-                existingArticle.timestamp = new Date();
-                existingArticle.isNew = true;
-                // Update the snippet to reflect the new information
-                existingArticle.snippet = `AI-SYNTHESIZED BRIEF: Now consolidating ${existingArticle.sources.length} reports. Latest intelligence confirms use of water cannons during the standoff.`;
-                existingArticle.impact = "Updated Assessment: Escalatory grey-zone tactics increase risk of miscalculation in critical sea lanes.";
+                if (getPref('autoConsolidate')) {
+                    existingArticle.sources.push(newReport);
+                    existingArticle.timestamp = new Date();
+                    existingArticle.isNew = true;
+                    existingArticle.snippet = `AI-SYNTHESIZED BRIEF: Now consolidating ${existingArticle.sources.length} reports. Latest intelligence confirms use of water cannons during the standoff.`;
+                    existingArticle.impact = "Updated Assessment: Escalatory grey-zone tactics increase risk of miscalculation in critical sea lanes.";
+                    targetArticle = existingArticle;
+                } else {
+                    const newArticle = {
+                        id: Math.max(...masterNewsData.map(a => a.id)) + 1,
+                        category: existingArticle.category,
+                        title: `${existingArticle.title} Update`,
+                        relevance: existingArticle.relevance,
+                        timestamp: new Date(),
+                        sentiment: existingArticle.sentiment,
+                        entities: existingArticle.entities,
+                        snippet: newReport.snippet,
+                        impact: existingArticle.impact,
+                        sources: [newReport],
+                        isNew: true
+                    };
+                    masterNewsData.unshift(newArticle);
+                    displayedArticles.unshift(newArticle);
+                    targetArticle = newArticle;
+                }
             }
-            
+
+            if (targetArticle && getPref('backgroundAnalysis')) {
+                getAnalysis(targetArticle, document.createElement('div'));
+            }
+
             const activeButton = document.querySelector('.control-btn.active');
             const sortBy = activeButton ? activeButton.dataset.sort : 'relevance';
             renderPriorityFeed(sortBy);
@@ -376,12 +442,16 @@
 
         function handleSettings() {
             const currentKey = localStorage.getItem('googleAIApiKey') || '';
-            const settingsHtml = `<div class="space-y-4"><p class="text-sm text-gray-600">Enter your Google AI API key to enable AI-powered features. Your key is saved only in your browser's local storage and is never sent to our servers.</p><div><label for="api-key-input" class="font-bold mono-font">Google AI API Key</label><input id="api-key-input" type="password" value="${currentKey}" class="brutalist-pane w-full p-2 mono-font text-sm mt-1 focus:outline-none focus:border-black" placeholder="Enter your API key..."></div><a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-sm text-blue-600 hover:underline">Get an API key from Google AI Studio &rarr;</a><div class="flex justify-end gap-2 pt-4 border-t-2"><button id="save-key-btn" class="control-btn active font-semibold py-2 px-4">Save Key</button></div></div>`;
+            const settingsHtml = `<div class="space-y-4"><p class="text-sm text-gray-600">Enter your Google AI API key to enable AI-powered features. Your key is saved only in your browser's local storage and is never sent to our servers.</p><div class="space-y-2"><label class="flex items-center"><input id="toggle-auto-refresh" type="checkbox" class="mr-2" ${getPref('autoRefresh') ? 'checked' : ''}>Auto Refresh Feed</label><label class="flex items-center"><input id="toggle-auto-consolidate" type="checkbox" class="mr-2" ${getPref('autoConsolidate') ? 'checked' : ''}>Auto Consolidate Reports</label><label class="flex items-center"><input id="toggle-background-analysis" type="checkbox" class="mr-2" ${getPref('backgroundAnalysis') ? 'checked' : ''}>Background Analysis</label></div><div><label for="api-key-input" class="font-bold mono-font">Google AI API Key</label><input id="api-key-input" type="password" value="${currentKey}" class="brutalist-pane w-full p-2 mono-font text-sm mt-1 focus:outline-none focus:border-black" placeholder="Enter your API key..."></div><a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-sm text-blue-600 hover:underline">Get an API key from Google AI Studio &rarr;</a><div class="flex justify-end gap-2 pt-4 border-t-2"><button id="save-settings-btn" class="control-btn active font-semibold py-2 px-4">Save Settings</button></div></div>`;
             openModal("Settings", settingsHtml);
-            document.getElementById('save-key-btn').addEventListener('click', () => {
+            document.getElementById('save-settings-btn').addEventListener('click', () => {
                 const newKey = document.getElementById('api-key-input').value;
                 localStorage.setItem('googleAIApiKey', newKey);
-                modalContainer.innerHTML = ''; // Close modal
+                localStorage.setItem('autoRefresh', document.getElementById('toggle-auto-refresh').checked);
+                localStorage.setItem('autoConsolidate', document.getElementById('toggle-auto-consolidate').checked);
+                localStorage.setItem('backgroundAnalysis', document.getElementById('toggle-background-analysis').checked);
+                modalContainer.innerHTML = '';
+                updateAutomationIndicators();
                 const activeCard = document.querySelector('.priority-card.active');
                 if (activeCard) {
                     renderAnalysis(activeCard.dataset.id);
@@ -408,7 +478,7 @@
         renderStandbyPanel();
 
         // Auto-update interval
-        setInterval(checkForNewArticle, 15000);
+        setInterval(() => { if (getPref('autoRefresh')) checkForNewArticle(); }, 15000);
         
         // FIX: Replaced IntersectionObserver with a more reliable scroll event listener
         priorityFeed.addEventListener('scroll', () => {
