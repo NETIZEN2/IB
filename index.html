@@ -263,11 +263,12 @@
                 else if (tabName === 'network') renderNetwork(article, analysisContent);
                 else if (tabName === 'sentiment') renderSentiment(article, analysisContent);
             }
-            document.querySelectorAll('.control-btn').forEach(btn => {
-                btn.addEventListener('click', e => {
-                    document.querySelectorAll('.control-btn').forEach(b => b.classList.remove('active'));
-                    e.target.classList.add('active');
-                    switchTab(e.target.dataset.tab);
+            const tabButtons = analysisPanel.querySelectorAll('.control-btn[data-tab]');
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    tabButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    switchTab(btn.dataset.tab);
                 });
             });
             switchTab('analysis');
