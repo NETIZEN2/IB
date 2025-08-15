@@ -95,7 +95,10 @@
                     <button class="control-btn active font-semibold py-1 px-3" data-sort="relevance">Most Relevant</button>
                     <button class="control-btn font-semibold py-1 px-3" data-sort="time">Latest</button>
                 </div>
-                <button id="export-btn" class="control-btn font-semibold py-1 px-3 text-sm flex items-center gap-1"><i class="ph ph-download-simple"></i> Export SITREP</button>
+                <div class="flex gap-2">
+                    <button id="refresh-btn" class="control-btn font-semibold py-1 px-3 text-sm flex items-center gap-1"><i class="ph ph-arrows-clockwise"></i> Refresh</button>
+                    <button id="export-btn" class="control-btn font-semibold py-1 px-3 text-sm flex items-center gap-1"><i class="ph ph-download-simple"></i> Export SITREP</button>
+                </div>
             </div>
 
             <main id="priority-feed" class="flex-grow space-y-4 overflow-y-auto pr-2"></main>
@@ -107,6 +110,7 @@
     
     <div id="modal-container"></div>
 
+    <script type="module" src="src/data/index.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const priorityFeed = document.getElementById('priority-feed');
@@ -115,6 +119,7 @@
         const rfiInput = document.getElementById('rfi-search-input');
         const rfiBtn = document.getElementById('rfi-search-btn');
         const exportBtn = document.getElementById('export-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
         const settingsBtn = document.getElementById('settings-btn');
         const modalContainer = document.getElementById('modal-container');
 
@@ -400,12 +405,26 @@
         rfiBtn.addEventListener('click', handleRfiSearch);
         rfiInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleRfiSearch(); });
         exportBtn.addEventListener('click', handleExport);
+        refreshBtn.addEventListener('click', async () => {
+            refreshBtn.disabled = true;
+            await window.dataModule.refreshData();
+            masterNewsData = await window.dataModule.loadStoredItems();
+            displayedArticles = masterNewsData.slice(0, articlesPerPage);
+            renderPriorityFeed();
+            renderStandbyPanel();
+            refreshBtn.disabled = false;
+        });
         settingsBtn.addEventListener('click', handleSettings);
 
         // Initial Load
-        displayedArticles = masterNewsData.slice(0, articlesPerPage);
-        renderPriorityFeed();
-        renderStandbyPanel();
+        window.dataModule.loadStoredItems().then(items => {
+            if (items.length) {
+                masterNewsData = items.sort((a,b) => b.timestamp - a.timestamp);
+            }
+            displayedArticles = masterNewsData.slice(0, articlesPerPage);
+            renderPriorityFeed();
+            renderStandbyPanel();
+        });
 
         // Auto-update interval
         setInterval(checkForNewArticle, 15000);
