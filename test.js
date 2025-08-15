@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs';
+import { normalizeItem, fetchFile } from './src/data/index.js';
 
 const html = readFileSync('index.html', 'utf8');
 
@@ -28,3 +29,21 @@ if (!distStyleRegex.test(html)) {
 }
 
 console.log('Index.html structure looks good');
+
+const rawItems = [
+  { title: 'A', link: 'http://a', pubDate: '2024-01-01T00:00:00Z' },
+  { headline: 'B', url: 'http://b', date: '2024-02-02T00:00:00Z' }
+];
+const normalized = rawItems.map(i => normalizeItem(i, 'test'));
+if (normalized[0].title !== 'A' || normalized[1].title !== 'B') {
+  console.error('Normalization failed');
+  process.exit(1);
+}
+console.log('Normalization works');
+
+const fileItems = await fetchFile('./public/data/sample-items.json');
+if (!Array.isArray(fileItems) || fileItems.length !== 2) {
+  console.error('File fetch failed');
+  process.exit(1);
+}
+console.log('File fetch works');

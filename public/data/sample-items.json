@@ -1,0 +1,12 @@
+[
+  {
+    "title": "Sample File Item",
+    "url": "https://example.com/file1",
+    "date": "2024-01-01T00:00:00Z"
+  },
+  {
+    "headline": "Another Sample",
+    "link": "https://example.com/file2",
+    "pubDate": "2024-02-02T00:00:00Z"
+  }
+]
