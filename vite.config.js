@@ -5,12 +5,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      input: {
-        main: './src/main.js',
-        header: './src/components/layout/Header.js',
-        priority: './src/components/layout/PriorityFeed.js',
-        analysis: './src/components/layout/AnalysisPanel.js'
-      }
+      input: 'src/main.js'
     }
   }
 });
