@@ -15,7 +15,11 @@ export async function scoreItem(item, { aiClient } = {}) {
       const aiScore = await aiClient.score(item);
       if (typeof aiScore === 'number') return aiScore;
     } catch (e) {
-      // fall back to rules
+      console.error('AI client failed, falling back to rule-based scoring:', e);
+      const fallbackScore = runRules(item);
+      const err = new Error('AI client failed');
+      err.fallbackScore = fallbackScore;
+      throw err;
     }
   }
   return runRules(item);
