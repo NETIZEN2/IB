@@ -28,3 +28,20 @@ if (!distStyleRegex.test(html)) {
 }
 
 console.log('Index.html structure looks good');
+
+const requiredAria = ['settings-btn', 'theme-toggle', 'rfi-search-input', 'rfi-search-btn', 'export-btn'];
+for (const id of requiredAria) {
+  const pattern = new RegExp(`<[^>]*id="${id}"[^>]*aria-label=`, 'i');
+  if (!pattern.test(html)) {
+    console.error(`Accessibility: element #${id} missing aria-label`);
+    process.exit(1);
+  }
+}
+
+const filterButtons = html.match(/<button[^>]*data-sort="[^"]+"[^>]*>/gi) || [];
+if (filterButtons.some(btn => !/aria-pressed=/.test(btn))) {
+  console.error('Accessibility: sort buttons missing aria-pressed');
+  process.exit(1);
+}
+
+console.log('Accessibility checks passed');
