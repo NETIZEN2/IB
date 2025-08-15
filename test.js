@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs';
+import { networkData, sentimentData } from './src/visualizations/fixtures.js';
 
 const html = readFileSync('index.html', 'utf8');
 
@@ -28,3 +29,20 @@ if (!distStyleRegex.test(html)) {
 }
 
 console.log('Index.html structure looks good');
+
+// Validate network graph data fixture
+if (!Array.isArray(networkData.nodes) || !Array.isArray(networkData.links)) {
+  console.error('Network data fixture is invalid');
+  process.exit(1);
+}
+
+// Validate sentiment timeline data fixture
+if (
+  !Array.isArray(sentimentData) ||
+  !sentimentData.every((d) => 'date' in d && 'sentiment' in d)
+) {
+  console.error('Sentiment data fixture is invalid');
+  process.exit(1);
+}
+
+console.log('Visualization data fixtures look good');
