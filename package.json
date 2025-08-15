@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node test.js"
+    "lint": "eslint .",
+    "test": "jest",
+    "test:e2e": "playwright test"
   },
   "keywords": [],
   "author": "",
