@@ -44,7 +44,26 @@
         <div id="analysis-panel" class="w-1/2 brutalist-pane flex flex-col h-full overflow-y-auto"></div>
     </div>
 
-    <div id="modal-container"></div>
+    <div id="modal-container" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="brutalist-pane p-4 bg-white space-y-4">
+            <label class="block">
+                <span class="text-sm font-semibold">Auto-refresh interval (sec)</span>
+                <input id="auto-refresh" type="number" class="border p-1 w-full">
+            </label>
+            <label class="block">
+                <span class="text-sm font-semibold">Data source</span>
+                <select id="data-source" class="border p-1 w-full">
+                    <option value="default">Default</option>
+                    <option value="alt">Alternate</option>
+                </select>
+            </label>
+            <label class="block">
+                <span class="text-sm font-semibold">Analysis rules</span>
+                <textarea id="analysis-rules" class="border p-1 w-full"></textarea>
+            </label>
+            <button id="save-settings" class="control-btn font-semibold py-1 px-3">Save</button>
+        </div>
+    </div>
 
     <script type="module" src="dist/main.js"></script>
 </body>
